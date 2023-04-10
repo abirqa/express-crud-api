@@ -1,0 +1,4 @@
+#This File will untrack all the folders and files and we don't want to track
+
+#Untrack node_modules folder
+*node_modules
