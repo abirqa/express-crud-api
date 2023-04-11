@@ -3,6 +3,7 @@ const port = 5001;
 const db_connect = require("./database/db_config");
 const cors = require("cors");
 const bodyParser = require("body-parser");
+const bcrypt = require("bcryptjs");
 
 //Initialize Express app//
 const app = express();
@@ -15,7 +16,7 @@ app.use(express.json());
 app.get("/", (req, res) => {
   if (!db_connect) {
     throw err;
-    console.log("DB Connection not successfull");
+    res.status(404).send("DB CONNECTION ERROR");
   } else {
     res.status(200).send("DB Connection Successfull");
   }
@@ -23,13 +24,20 @@ app.get("/", (req, res) => {
 
 /****** INSERT USER API LOGIC *******/
 
-app.post("/api/newUser", (req, res) => {
+const securePassword = async (password) => {
+  const hashedPassword = await bcrypt.hash(password, 10);
+  return hashedPassword;
+};
+
+app.post("/api/newUser", async (req, res) => {
   //get the request body from user//
   const { name, email, password, phone } = req.body;
 
+  const hashedPassword = await securePassword(password);
+
   db_connect.query(
     "INSERT INTO `users`(`name`, `email`, `password`, `phone`) VALUES (?, ?, ?, ?)",
-    [name, email, password, phone],
+    [name, email, hashedPassword, phone],
     (err, results) => {
       if (err) {
         throw err;
@@ -130,6 +138,47 @@ app.get("/api/getUserByNames/", (req, res) => {
       }
     }
   );
+});
+
+/*************** UPDATE USER DATA BASED ON USER ID ******************/
+
+app.put("/api/updateUser/:id", async (req, res) => {
+  const id = req.params.id;
+  const { name, email, password, phone } = req.body;
+
+  const hashedPassword = await securePassword(password);
+
+  db_connect.query(
+    `UPDATE users SET name = ? , email = ? , password = ? , phone= ? WHERE id = ${id} `,
+    [name, email, hashedPassword, phone],
+    (err, results) => {
+      try {
+        res.status(200).send({
+          message: "User Data has been Updated Successfully",
+        });
+      } catch {
+        throw err;
+        res.status(500).send({ message: "Error !!! While Updating User Data" });
+      }
+    }
+  );
+});
+
+/*************** DELETE USER BASED ON USER ID ******************/
+
+app.delete("/api/deleteUser/:id", (req, res) => {
+  const id = req.params.id;
+
+  db_connect.query(`DELETE FROM users WHERE id = ${id}`, id, (err, results) => {
+    try {
+      if (results) {
+        res.status(200).send({ message: "User ID Deleted Successfully" });
+      }
+    } catch {
+      throw err;
+      res.status(500).send({ message: "Internal Server Error" });
+    }
+  });
 });
 
 //Listen to port number//
